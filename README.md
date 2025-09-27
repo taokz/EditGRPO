@@ -1,8 +1,15 @@
 # EditGRPO: Reinforcement Learning with Post‑Rollout Edits
 
+**[📖 Read the Paper](EditGRPO_preprint.pdf)** | **[🔗 arXiv (Coming Soon)](#)** | **[💻 Code](#quickstart-run-qwen25vl3b-with-editgrpo)**
+
+> **EditGRPO: Reinforcement Learning with Post‑Rollout Edits**  
+> *A novel approach for training vision-language models with post-rollout editing for clinically accurate chest X-ray report generation*
+
+---
+
 ## Overview
 
-EditGRPO introduces post‑rollout edits for training vision‑language models to generate clinically accurate chest X‑ray reports. This repository contains training scripts, reward server utilities, and evaluation tools, with examples centered on Qwen2.5‑VL‑3B. The major 
+EditGRPO introduces post‑rollout edits for training vision‑language models to generate clinically accurate chest X‑ray reports. This repository contains the preprint, training scripts, reward server utilities, and evaluation tools, with examples centered on Qwen2.5‑VL‑3B. 
 
 <p align="center">
     <img src="assets/overview.png" width="80%"/>
