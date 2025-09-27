@@ -1,0 +1,92 @@
+data:
+  train_files: iu_xray_train.json
+  val_files: iu_xray_test.json
+  prompt_key: conversations
+  answer_key: conversations
+  image_key: image
+  max_prompt_length: 4096
+  max_response_length: 4096
+  rollout_batch_size: 32
+  val_batch_size: -1
+  shuffle: true
+  seed: 1
+  max_pixels: 1605632
+  min_pixels: 262144
+
+algorithm:
+  adv_estimator: grpo
+  disable_kl: false
+  use_kl_loss: true
+  kl_penalty: low_var_kl
+  kl_coef: 1.0e-2
+  force_gt_num: 0
+  norm_adv_by_std_in_grpo: true
+  loss_agg_mode: token-mean
+
+worker:
+  actor:
+    global_batch_size: 32
+    micro_batch_size_per_device_for_update: 2
+    micro_batch_size_per_device_for_experience: 8
+    max_grad_norm: 1.0
+    padding_free: true
+    ulysses_sequence_parallel_size: 1
+    model:
+      model_path: Qwen/Qwen2.5-3B-Instruct
+      enable_gradient_checkpointing: true
+      trust_remote_code: false
+      freeze_vision_tower: false
+    optim:
+      lr: 1.0e-6
+      weight_decay: 1.0e-2
+      strategy: adamw  # {adamw, adamw_bf16}
+      lr_warmup_ratio: 0.0
+    fsdp:
+      enable_full_shard: true
+      enable_cpu_offload: false
+      enable_rank0_init: true
+    offload:
+      offload_params: true   # true: more CPU memory; false: more GPU memory
+      offload_optimizer: true   # true: more CPU memory; false: more GPU memory
+
+  rollout:
+    temperature: 1.0
+    n: 5
+    gpu_memory_utilization: 0.6
+    enforce_eager: false
+    enable_chunked_prefill: false
+    tensor_parallel_size: 2
+    limit_images: 2
+    val_override_config:
+      temperature: 0.5
+      n: 1
+
+  ref:
+    fsdp:
+      enable_full_shard: true
+      enable_cpu_offload: true  # true: more CPU memory; false: more GPU memory
+      enable_rank0_init: true
+    offload:
+      offload_params: false
+
+  reward:
+    reward_type: function
+    compute_score: radgraph_chexbert_14
+    reward_server: 'http://REWARD_SERVER_HOST:5000/predict'
+    type: 'cot'
+
+trainer:
+  total_episodes: 1
+  logger: ["console", "wandb"]
+  project_name: editgrpo
+  experiment_name: qwen2_5_7b_iu_xray
+  n_gpus_per_node: 8
+  nnodes: 1
+  val_freq: -1   # -1 to disable
+  val_before_train: true
+  val_only: false
+  val_generations_to_log: 3
+  save_freq: 10  # -1 to disable
+  save_limit: 1  # -1 to disable
+  save_checkpoint_path: "/mnt/ckpt"
+  load_checkpoint_path: null
