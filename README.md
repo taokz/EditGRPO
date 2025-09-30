@@ -3,9 +3,15 @@
 **[📖 Read the Paper](EditGRPO_preprint.pdf)** | **[🔗 arXiv](https://arxiv.org/abs/2509.22812)** | **[💻 Code](#quickstart-run-qwen25vl3b-with-editgrpo)**
 
 > **EditGRPO: Reinforcement Learning with Post‑Rollout Edits**  
-> *A novel approach for training vision-language models with post-rollout editing for clinically accurate chest X-ray report generation*
+> * **Clinical alignment gap.**
+  Supervised fine-tuning optimizes phrasing, not *clinical correctness*. Models still miss or hallucinate findings; RL lets us optimize *clinically motivated rewards* directly.
+> * **Observed failure mode of on-policy GRPO.**
+  Pure on-policy rollouts often *collapse to generic reports* (e.g., “no findings”), yielding flat/low-signal advantages and unstable learning.
+>* **Core idea & lightweight implementation.**
+  During training, apply *minimal sentence-level edits* to each rollout using the gold reference—creating edited trajectories that *guide exploration* while staying close to the policy (stablize training by avoiding excessive policy shift).
 
----
+> **Practical bits:** no large editor model - rule/NER-driven edits; drop-in for GRPO (uses unnormalized advantages); no inference-time overhead: edits only happen in training; recompute the model logits/log-probabilities on the edited sequence.
+<!-- --- -->
 
 ## Overview
 
@@ -165,7 +171,7 @@ If you find our paper and code useful in your research, please consider giving a
 
 ```BibTeX
 @article{EditGRPO,
-  title={EditGRPO: Reinforcement Learning with Post -Rollout Edits for Clinically Accurate Chest X-Ray Report Generation},
+  title={EditGRPO: Reinforcement Learning with Post-Rollout Edits for Clinically Accurate Chest X-Ray Report Generation},
   author={Kai Zhang, Christopher Malon, Lichao Sun, Martin Renqiang Min},
   journal={arXiv preprint arXiv:2509.22812},
   year={2025}
