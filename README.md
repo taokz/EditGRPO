@@ -1,6 +1,6 @@
 # EditGRPO: Reinforcement Learning with Post‑Rollout Edits
 
-**[📖 Read the Paper](EditGRPO_preprint.pdf)** | **[🔗 arXiv (Coming Soon)](#)** | **[💻 Code](#quickstart-run-qwen25vl3b-with-editgrpo)**
+**[📖 Read the Paper](EditGRPO_preprint.pdf)** | **[🔗 arXiv](https://arxiv.org/abs/2509.22812)** | **[💻 Code](#quickstart-run-qwen25vl3b-with-editgrpo)**
 
 > **EditGRPO: Reinforcement Learning with Post‑Rollout Edits**  
 > *A novel approach for training vision-language models with post-rollout editing for clinically accurate chest X-ray report generation*
@@ -152,12 +152,16 @@ python green_eval.py \
 ## Acknowledgement
 Our EditGRPO is build on top of [EasyR1](https://github.com/hiyouga/EasyR1/tree/main), [verl](https://github.com/volcengine/verl), and [Qwen2.5VL](https://github.com/QwenLM/Qwen2.5-VL).
 
-<!-- ## Citation
+## Citation
 
 If you find our paper and code useful in your research, please consider giving a star :star: and citation :pencil: :)
 
 ```BibTeX
 
-@article{
+@article{EditGRPO,
+  title={EditGRPO: Reinforcement Learning with Post -Rollout Edits for Clinically Accurate Chest X-Ray Report Generation},
+  author={Kai Zhang, Christopher Malon, Lichao Sun, Martin Renqiang Min},
+  journal={arXiv preprint arXiv:2509.22812},
+  year={2025}
 }
-``` -->
+```
