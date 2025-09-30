@@ -1,4 +1,4 @@
-# EditGRPO: Reinforcement Learning with Post‑Rollout Edits
+# EditGRPO
 
 **[📖 Read the Paper](EditGRPO_preprint.pdf)** | **[🔗 arXiv](https://arxiv.org/abs/2509.22812)** | **[💻 Code](#quickstart-run-qwen25vl3b-with-editgrpo)**
 
@@ -17,6 +17,13 @@ EditGRPO introduces post‑rollout edits for training vision‑language models t
 
 ## Performance
 
+Applied to a Qwen2.5-VL-3B MLLM initialized with supervised fine-tuning (SFT), 
+EditGRPO outperforms both SFT and vanilla GRPO baselines, achieving an average
+improvement of 3.4% in CheXbert, GREEN, Radgraph, and RATEScore metrics across 
+four major chest X-ray report generation datasets.
+Notably, EditGRPO also demonstrates superior out-of-domain generalization, with an average
+performance gain of 5.9% on unseen datasets.
+
 <p align="center">
     <img src="assets/performance.png" width="80%"/>
 <p>
@@ -25,7 +32,7 @@ EditGRPO introduces post‑rollout edits for training vision‑language models t
 
 ### Hardware Requirements
 
-\* *Estimated for MIMIC‑CXR full‑parameter training with Qwen‑2.5‑VL*
+\* *Recommanded for MIMIC‑CXR full‑parameter training with Qwen‑2.5‑VL. Smaller or non-multi-view datasets require fewer resources.*
 
 | Memory                   |   3B   |   7B   |
 | ------------------------ | ------ | ------ |
@@ -157,7 +164,6 @@ Our EditGRPO is build on top of [EasyR1](https://github.com/hiyouga/EasyR1/tree/
 If you find our paper and code useful in your research, please consider giving a star :star: and citation :pencil: :)
 
 ```BibTeX
-
 @article{EditGRPO,
   title={EditGRPO: Reinforcement Learning with Post -Rollout Edits for Clinically Accurate Chest X-Ray Report Generation},
   author={Kai Zhang, Christopher Malon, Lichao Sun, Martin Renqiang Min},
