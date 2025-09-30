@@ -1,0 +1,34 @@
+# macOS 系统文件
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# 缓存文件
+*.log
+*.tmp
+*.swp
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# 编译文件
+*.o
+*.out
+*.class
+
+# IDE 编辑器文件
+.vscode/
+.idea/
+*.iml
+
+# 环境配置文件（可选）
+.env
+
