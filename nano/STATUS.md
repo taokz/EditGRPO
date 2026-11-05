@@ -23,7 +23,20 @@
   agree, hand-computed `get_rope_index`, gradients finite with checkpointing on, preprocess/grid consistency.
 - CPU smoke run: `python nano/train.py --synthetic --steps 2 --rollout_batch_size 4 --n 4 --micro_batch_size 4`
   -> finite loss, 8/16 rollouts replaced by edited versions (2 per group of 4), reward and repetition logged.
-- Real-weight equivalence with HF is NOT verified here (no GPU, no weights); see the list below.
+- Tiny-config parity against `transformers` `Qwen2_5_VLForConditionalGeneration` (optional test, skipped when
+  transformers is absent): identical 3-D position ids, vision features within 2e-7, logits within 1.4e-6 (fp32),
+  identical greedy tokens on a left-padded batch with partially padded attention windows.
+- Real-weight equivalence is still NOT verified (no GPU, no weights). Conventions chosen and to confirm on GPU:
+  1. `rope_deltas` follow transformers 4.49 (`max_pos + 1 - padded_len`, the version the original pins); 5.x
+     defines them differently but decode positions coincide.
+  2. Padded positions are filled with 1 (4.49) instead of 0 (5.x); masked, no effect on outputs.
+  3. Image temporal index is 0 (images only; video not implemented).
+  4. `image_preprocess` resizes with PIL bicubic like the 4.x processor; 5.x uses torchvision bicubic
+     (pixel-level ~1e-2 differences possible). Check one CXR against `AutoProcessor`.
+  5. SDPA everywhere; fully padded query rows attend everywhere to avoid NaN (outputs are padding).
+  6. `sliding_window` config fields are ignored (Qwen2.5-VL ships with `use_sliding_window: false`).
+- Weight loading: HF Hub key names are kept; transformers>=5 checkpoints (`model.language_model.*`,
+  `model.visual.*`) are renamed; tied `lm_head` is re-tied when absent from the shards.
 
 ## Stubbed / not reproduced here
 - Clinical rewards and the RaTE extractor are untested in this environment (no GPU, libraries not installed).
