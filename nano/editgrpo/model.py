@@ -510,7 +510,7 @@ class Qwen25VL(nn.Module):
 
     def __init__(self, cfg: Qwen25VLConfig) -> None:
         super().__init__()
-        self.cfg = cfg
+        self.config = cfg
         self.visual = VisionTransformer(cfg.vision_config)
         self.model = Qwen2Model(cfg)
         self.lm_head = nn.Linear(cfg.hidden_size, cfg.vocab_size, bias=False)
@@ -544,7 +544,7 @@ class Qwen25VL(nn.Module):
         """
         b, t_len = input_ids.shape
         device = input_ids.device
-        m = self.cfg.vision_config.spatial_merge_size
+        m = self.config.vision_config.spatial_merge_size
         if attention_mask is None:
             attention_mask = torch.ones_like(input_ids)
         valid = attention_mask.bool()
@@ -556,7 +556,7 @@ class Qwen25VL(nn.Module):
             segments, st, cur = [], 0, 0  # cur: next free position
             while True:
                 try:
-                    ed = tokens.index(self.cfg.image_token_id, st)
+                    ed = tokens.index(self.config.image_token_id, st)
                 except ValueError:
                     break
                 if image_grid_thw is None or image_index >= len(image_grid_thw):
@@ -598,7 +598,7 @@ class Qwen25VL(nn.Module):
         x = self.model.embed_tokens(input_ids)
         if pixel_values is not None:
             feats = self.visual(pixel_values, image_grid_thw).to(x.dtype)
-            image_mask = input_ids == self.cfg.image_token_id
+            image_mask = input_ids == self.config.image_token_id
             n_tokens = int(image_mask.sum())
             if n_tokens != feats.shape[0]:
                 raise ValueError(f"{n_tokens} image tokens in input_ids but {feats.shape[0]} image features")

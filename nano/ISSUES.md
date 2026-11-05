@@ -59,7 +59,7 @@ Everything marked "needs GPU validation" changes training behaviour and has not 
 - Where: `eval/lightweight_eval.py:399-400` (`radgraph_scores_array = [radgraph_combined_score] * len(hyps)`, `bleu2_scores = [bleu2_score] * len(hyps)`), consumed at `:411`.
 - Evidence: per-sample RadCliQ mixes per-sample BERTScore/semb with one corpus RadGraph and one corpus BLEU-2 value, so it is not the RadCliQ composite metric.
 - Fix: compute RadGraph and BLEU-2 per sample (fix-original); nano reports corpus-level components separately and does not report this composite.
-- Status: fix-original; doc.
+- Status: documented only (not on fix-original: needs per-sample RadGraph/BLEU plumbing in the eval script).
 - Test: two hyps of different quality must get different RadGraph/BLEU inputs.
 
 ## #9 [low] Config / packaging bugs
@@ -67,10 +67,31 @@ Everything marked "needs GPU validation" changes training behaviour and has not 
 - yaml `compute_score: radgraph_chexbert_14` (`examples/editgrpo_*_2_5.yaml:74`) is not accepted by `CustomRewardManager` (`verl/workers/reward/custom.py:93-129` raises NotImplementedError); only the sbatch override `rad_server` (`examples/mimic_cxr_editgrpo_ops1_para_half_tau_0_6.sbatch:105`) works.
 - `__all__` is missing a comma (`verl/utils/reward_score/__init__.py:30-31`): `"r1v_compute_score" "bleu4_compute_score"` concatenate into one bogus name.
 - `flask_server/README.md` documents a different server than `all_flask_server.py`.
-- Status: fix-original; doc.
+- Status: documented only.
 - Test: `python -c "import verl.utils.reward_score as r; [getattr(r, n) for n in r.__all__]"`.
 
 ## #10 [low] Train/eval metric scale mismatch
 - Training reward uses per-sample micro-F1 (CheXbert-14); eval reports corpus-level scores. Absolute values are not comparable; reward curves cannot be read against eval tables.
 - Status: doc; nano logs both per-sample and corpus-level.
 - Test: compare mean per-sample micro-F1 with corpus micro-F1 on a fixed set.
+
+## #11 [med] Identical ANATOMY entities are classified as false positives
+- Where: `flask_server/RaTEscore_extractor.py:285-310`: match score = cos * affinity[(type_g, type_r)] * penalty, FP if best < 0.6. The RaTEScore affinity for (ANATOMY, ANATOMY) is 0.2856 (`:36`), so even cos = 1 gives 0.29 < 0.6.
+- Evidence: `nano/tests/test_edit.py::test_compare_entities_fp_fn_contradiction` ("heart" in both texts is an FP). Pinned as faithful behaviour.
+- Root cause: RaTEScore's affinity matrix weights *score contributions*; reusing it as a matching score against a fixed threshold makes some type pairs unmatchable. Consequence: the delete op can remove correct anatomy-only sentences.
+- Fix (proposal, training-affecting, needs GPU validation): threshold on raw cosine for same-type pairs, or rescale affinity per row. Not implemented; nano keeps the original behaviour.
+- Status: documented only.
+
+## #12 [low] `type(e).__name__` crashes in the reward client's error path
+- Where: `verl/utils/reward_score/rad_scores.py` generic `except` handler: the parameter named `type` shadows the builtin, so the "return zeros" path raised `TypeError` instead.
+- Status: fixed on `fix-original` (commit "rad_scores: add strict option to raise on server errors").
+
+## Status of the `fix-original` branch (from `main`, one commit per bug, defaults unchanged)
+| Issue | Commit | Flag |
+|---|---|---|
+| #2 | eval: add --no-legacy-dedup flag and repetition metrics | `--no-legacy-dedup` (default keeps dedup) |
+| #3 | RaTEscore_extractor: add fix_tau_scaling option | `fix_tau_scaling=False` |
+| #1 | rollout: add extractor_append_eos option | `RolloutConfig.extractor_append_eos=False` |
+| #4 | rad_scores: raise ValueError when server returns one score for multiple hyps | always (was silent zeros) |
+| #5, #12 | rad_scores: add strict option to raise on server errors | `strict=False` |
+Tests: `tests_fix/test_bug_{a..e}_*.py` on that branch (plain scripts, exit 0).
