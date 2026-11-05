@@ -986,6 +986,8 @@ class vLLMRollout(BaseRollout):
                             
                             # Only tokenize texts that actually changed
                             tokens = self._clean_text_and_tokenize(modified, self.config.response_length)
+                            if getattr(self.config, "extractor_append_eos", False) and self.tokenizer.eos_token_id is not None:
+                                tokens = tokens[:self.config.response_length - 1] + [self.tokenizer.eos_token_id]
                             
                             padded_tokens = torch.full(
                                 (self.config.response_length,),

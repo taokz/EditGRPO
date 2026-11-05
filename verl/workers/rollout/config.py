@@ -49,6 +49,7 @@ class RolloutConfig:
     extractor_num_ops_per_para: int = field(default=1, init=False)
     extractor_num_para: int = field(default=1, init=False)
     extractor_similarity_threshold: float = field(default=0, init=False)
+    extractor_append_eos: bool = False  # append EOS after edited response tokens (original: False)
 
     def to_dict(self):
         return asdict(self)
