@@ -14,8 +14,16 @@
 - `plugins/rate_extractor.py`: RaTE-NER + BioLORD extractor in-process.
 - ISSUES.md (12 issues), SECURITY_NOTES.md, `fix-original` branch (5 commits, one per bug, defaults unchanged).
 
-## Model (`model.py`)
-See the section at the bottom, updated when the pure-PyTorch Qwen2.5-VL landed.
+## Model (`model.py`, ~800 lines, torch + safetensors only)
+- Vision tower (patch embed, 2D RoPE, window/full attention blocks, PatchMerger), Qwen2 LM with M-RoPE
+  (`get_rope_index`, `mrope_section` interleave), GQA, 2D attention masks for left-padded prompts, per-layer KV cache,
+  gradient checkpointing, `generate` with temperature/top-p/top-k, `load_pretrained` (HF key names kept) and
+  `image_preprocess` (smart_resize to multiples of 28, CLIP normalisation, HF patch flattening order).
+- `tests/test_model.py` (10 tests, tiny random config): shapes, finite logits, cached vs uncached greedy decoding
+  agree, hand-computed `get_rope_index`, gradients finite with checkpointing on, preprocess/grid consistency.
+- CPU smoke run: `python nano/train.py --synthetic --steps 2 --rollout_batch_size 4 --n 4 --micro_batch_size 4`
+  -> finite loss, 8/16 rollouts replaced by edited versions (2 per group of 4), reward and repetition logged.
+- Real-weight equivalence with HF is NOT verified here (no GPU, no weights); see the list below.
 
 ## Stubbed / not reproduced here
 - Clinical rewards and the RaTE extractor are untested in this environment (no GPU, libraries not installed).
