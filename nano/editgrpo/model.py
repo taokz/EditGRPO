@@ -537,7 +537,9 @@ class Qwen25VL(nn.Module):
         Text tokens advance all three axes by 1. Each run of ``image_token_id`` tokens gets
         ``(t, h, w)`` indices over the ``(grid_t, grid_h // merge, grid_w // merge)`` llm grid, all
         offset by the position the run starts at; the following text continues from ``max + 1``.
-        Padding positions (``attention_mask == 0``) are set to 1 as in HF.
+        Padding positions (``attention_mask == 0``) are set to 1 as in HF. Without
+        ``image_grid_thw`` every token (image placeholders included) is treated as text, which is
+        HF's text-only fallback.
 
         Returns ``position_ids (3, B, T)`` and ``rope_deltas (B, 1)`` = ``max_position + 1 - T``,
         which is what incremental decoding needs to continue the sequence.
@@ -554,12 +556,12 @@ class Qwen25VL(nn.Module):
         for bi in range(b):
             tokens = input_ids[bi][valid[bi]].tolist()
             segments, st, cur = [], 0, 0  # cur: next free position
-            while True:
+            while image_grid_thw is not None:
                 try:
                     ed = tokens.index(self.config.image_token_id, st)
                 except ValueError:
                     break
-                if image_grid_thw is None or image_index >= len(image_grid_thw):
+                if image_index >= len(image_grid_thw):
                     raise ValueError("input_ids contain more image token runs than image_grid_thw rows")
                 t, h, w = (int(v) for v in image_grid_thw[image_index])
                 image_index += 1

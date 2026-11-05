@@ -11,13 +11,13 @@ decisions: [DECISIONS.md](DECISIONS.md); audit: [ISSUES.md](ISSUES.md); privacy:
 nano/
   editgrpo/
     data.py     records, Qwen2.5-VL prompt, synthetic data, left-pad collate
-    model.py    pure-PyTorch Qwen2.5-VL, load safetensors, KV-cache generate, image_preprocess   (TODO: other agent)
-    edit.py     entity comparison + sentence ops (replace/delete/add)                            (TODO: other agent)
-    grpo.py     group advantages, clipped policy loss, loss_agg modes, low_var_kl                (TODO: other agent)
-    reward.py   RadGraph / CheXbert / RaTEScore sum + plugins                                    (TODO: other agent)
-    rollout.py  Sampler interface, group sampling, edited re-tokenisation                       (TODO: integrator)
-    eval.py     raw metrics, legacy dedup flag, repetition rate                                  (TODO: other agent)
-  train.py      training loop                                                                    (TODO: integrator)
+    model.py    pure-PyTorch Qwen2.5-VL, load safetensors, KV-cache generate, image_preprocess
+    edit.py     entity comparison + sentence ops (replace/delete/add)
+    grpo.py     group advantages, clipped policy loss, loss_agg modes, low_var_kl
+    reward.py   RadGraph / CheXbert / RaTEScore sum + plugins
+    rollout.py  Sampler interface, group sampling, edited re-tokenisation
+    eval.py     raw metrics, legacy dedup flag, repetition rate
+  train.py      training loop
   tests/        pytest, CPU only, no network
 ```
 
@@ -45,19 +45,30 @@ See the table in [DESIGN.md](DESIGN.md) (component -> original file:line -> nano
 | min / max pixels | 262144 / 401408 |
 | reward | radgraphf1 + cxb14micro + ratescore (unweighted sum, range [0,3]) |
 
-## Clinical rewards and the RaTE extractor (plugins)  <!-- TODO: finish once reward.py / edit.py exist -->
+## Clinical rewards and the RaTE extractor (plugins)
 - Install `radgraph`, `f1chexbert`, `RaTEScore` (+ `transformers`); apply the patches in `modified_lib/` of the original repo to those packages.
 - The RaTE extractor (`Angelakeke/RaTE-NER-Deberta` + `FremyCompany/BioLORD-2023-C`) is loaded lazily as a plugin that returns entities and embeddings; the lexicon extractor is the CPU default.
-- TODO: exact module names and config keys.
+- Rewards: `editgrpo.reward.make_reward(["radgraphf1","cxb14micro","ratescore"], response_type="free_form", device="cuda")`
+  builds `SumReward` over `RadGraphF1Reward` (`pip install radgraph`), `CheXbert14MicroReward` (`pip install f1chexbert`),
+  `RaTEScoreReward` (`pip install RaTEScore`); apply the patches in `modified_lib/` to match the original server. In
+  `train.py`: `--reward clinical --reward_device cuda`. `--reward cheap` swaps in text stand-ins for CPU tests.
+- Edit extractor: `editgrpo.plugins.rate_extractor.RaTEExtractor(device=...)` (needs `transformers`), selected with
+  `--extractor rate`; `--extractor lexicon` is the CPU stand-in (`editgrpo.edit.LexiconExtractor`).
+- Edit knobs: `--num_ops_per_para 1 --num_para -1 --tau 0.6` (paper); `--fix_tau_scaling 1`, `--edited_append_eos 1`
+  enable the fixes from ISSUES.md #3 / #1 (off by default).
 
-## Plugging in nano-vllm  <!-- TODO: finish once rollout.py exists -->
+## Plugging in nano-vllm
 `rollout.py` defines a `Sampler` interface (generate G sequences per prompt given prompt ids and images,
 returning token ids and log-probs not required, since old log-probs are recomputed by the actor).
-Implement `Sampler.generate(batch, n, temperature, max_new_tokens)` with nano-vllm and pass it to `train.py`. TODO: signature.
+Implement the `editgrpo.rollout.Sampler` protocol: `sampler(batch, n, cfg: RolloutConfig, generator) -> response_ids`
+of shape `(B*n, cfg.response_length)`, prompt-major (row `i*n+k` is sample `k` of prompt `i`), right-padded with the pad
+id after the first EOS. `TorchSampler` is the reference implementation on top of `model.generate`; a nano-vllm sampler
+needs to sync weights from the training model after every step (the original lets vLLM reload actor weights).
+Pass your sampler to `rollout_with_edits(...)` in `train.py`.
 
 ## CPU smoke test
 ```
-python nano/train.py --synthetic --steps 2     # TODO: available once train.py lands
+python nano/train.py --synthetic --steps 2     # tiny random model, synthetic reports, cheap rewards, lexicon edits
 python -m pytest nano/tests -q
 ```
 
