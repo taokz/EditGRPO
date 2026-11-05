@@ -256,3 +256,87 @@ def test_config_from_hf_style_dict():
     assert cfg.head_dim == 128 and cfg.mrope_section == [16, 24, 24]
     assert cfg.vision_config.in_channels == 3 and cfg.vision_config.fullatt_block_indexes == [7, 15, 23, 31]
     assert Qwen25VLConfig.from_dict(cfg.to_dict()) == cfg
+
+
+def test_load_pretrained_tied_embeddings(tmp_path):
+    """3B ships tie_word_embeddings=True without lm_head.weight in the shards."""
+    from dataclasses import replace
+
+    from safetensors.torch import save_file
+
+    cfg = replace(CFG, tie_word_embeddings=True)
+    torch.manual_seed(5)
+    model = Qwen25VL(cfg).eval()
+    assert model.lm_head.weight.data_ptr() == model.model.embed_tokens.weight.data_ptr()
+    with open(tmp_path / "config.json", "w") as f:
+        json.dump(cfg.to_dict(), f)
+    state = {k: v.contiguous() for k, v in model.state_dict().items() if k != "lm_head.weight"}
+    save_file(state, str(tmp_path / "model.safetensors"))
+    loaded = load_pretrained(str(tmp_path), dtype=torch.float32)
+    assert loaded.lm_head.weight.data_ptr() == loaded.model.embed_tokens.weight.data_ptr()
+    assert torch.equal(loaded.lm_head.weight, model.model.embed_tokens.weight)
+    ids = torch.tensor([[1, 2, 3, 4]])
+    assert torch.allclose(model(ids)[0], loaded(ids)[0])
+
+
+def test_parity_with_transformers_if_installed():
+    """Optional: compare against the HF implementation when transformers>=5 happens to be installed.
+    Not a dependency of the package; skipped otherwise."""
+    transformers = pytest.importorskip("transformers")
+    if int(transformers.__version__.split(".")[0]) < 5:
+        pytest.skip("parity harness written for the transformers>=5 config API")
+    from transformers import Qwen2_5_VLConfig, Qwen2_5_VLForConditionalGeneration
+
+    ours = make_model()
+    vc = CFG.vision_config
+    hf_cfg = Qwen2_5_VLConfig(
+        text_config=dict(
+            hidden_size=CFG.hidden_size, intermediate_size=CFG.intermediate_size,
+            num_hidden_layers=CFG.num_hidden_layers, num_attention_heads=CFG.num_attention_heads,
+            num_key_value_heads=CFG.num_key_value_heads, vocab_size=CFG.vocab_size,
+            rms_norm_eps=CFG.rms_norm_eps, max_position_embeddings=CFG.max_position_embeddings,
+            tie_word_embeddings=False, use_sliding_window=False,
+            rope_parameters=dict(rope_type="default", rope_theta=CFG.rope_theta, mrope_section=CFG.mrope_section),
+        ),
+        vision_config=dict(
+            depth=vc.depth, hidden_size=vc.hidden_size, intermediate_size=vc.intermediate_size,
+            num_heads=vc.num_heads, out_hidden_size=vc.out_hidden_size, window_size=vc.window_size,
+            fullatt_block_indexes=vc.fullatt_block_indexes, patch_size=vc.patch_size,
+            spatial_merge_size=vc.spatial_merge_size, temporal_patch_size=vc.temporal_patch_size,
+        ),
+        image_token_id=IMG, video_token_id=CFG.video_token_id, vision_start_token_id=VS,
+        vision_end_token_id=VE, tie_word_embeddings=False,
+    )
+    hf_cfg._attn_implementation = "eager"
+    hf = Qwen2_5_VLForConditionalGeneration(hf_cfg).eval()
+    # our names are the transformers<5 names; >=5 nests them under model.visual / model.language_model
+    state = {}
+    for k, v in ours.state_dict().items():
+        if k.startswith("visual."):
+            k = "model.visual." + k[len("visual."):]
+        elif k.startswith("model."):
+            k = "model.language_model." + k[len("model."):]
+        state[k] = v
+    hf.load_state_dict(state, strict=True)
+
+    row0 = [11, 12, 13, VS] + [IMG] * 24 + [VE, 14, 15, 16]  # [1,12,8]: several (padded) windows
+    row1 = [21, 22, VS] + [IMG] * 4 + [VE, 23, 24]  # [1,4,4], left-padded
+    T = len(row0)
+    ids = torch.tensor([row0, [PAD] * (T - len(row1)) + row1])
+    am = (ids != PAD).long()
+    grid = torch.tensor([[1, 12, 8], [1, 4, 4]])
+    pv = torch.randn(96 + 16, PATCH_DIM, generator=torch.Generator().manual_seed(1))
+    mm = (ids == IMG).int()
+    with torch.no_grad():
+        ours_logits, _ = ours(ids, am, pixel_values=pv, image_grid_thw=grid)
+        hf_logits = hf(input_ids=ids, attention_mask=am, pixel_values=pv, image_grid_thw=grid,
+                       mm_token_type_ids=mm).logits
+        hf_pos, _ = hf.model.get_rope_index(ids, mm, image_grid_thw=grid, attention_mask=am)
+        our_pos, _ = ours.get_rope_index(ids, grid, am)
+        hf_gen = hf.generate(input_ids=ids, attention_mask=am, pixel_values=pv, image_grid_thw=grid,
+                             mm_token_type_ids=mm, max_new_tokens=6, do_sample=False, pad_token_id=PAD)
+        our_gen, _ = ours.generate(ids, am, pv, grid, max_new_tokens=6, temperature=0.0, pad_token_id=PAD)
+    valid = am.bool()
+    assert torch.equal(hf_pos[:, valid], our_pos[:, valid])
+    assert (ours_logits - hf_logits)[valid].abs().max() < 1e-4
+    assert torch.equal(hf_gen[:, T:], our_gen)

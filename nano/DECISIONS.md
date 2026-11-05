@@ -14,3 +14,8 @@
 - D7 Edited responses: original tokenises edited text without EOS. nano keeps that as default
   (`edited_append_eos=False`) and offers the fix behind a flag (needs GPU validation).
 - D8 Repetition: evaluation reports raw metrics, legacy-dedup metrics (flag) and a repetition rate.
+- D9 Sampled `<|image_pad|>` ids inside a response (only plausible for the tiny random test model) are fed to the
+  model as `<|vision_end|>` when recomputing log-probs, so they are not mistaken for image slots; the sampled id is
+  still the label. Real checkpoints never sample this token.
+- D10 Model tests use a tiny random config; real-weight equivalence vs HF is deferred to GPU (STATUS.md).
+- D11 `fix-original` was created as a worktree branch from `origin/main` and pushed; nothing merged into main.

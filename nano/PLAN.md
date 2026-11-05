@@ -32,3 +32,8 @@ Revised after reading the original code (not the prompt's assumptions).
   ported in-process; the NER/embedding models become an optional plugin, a lexicon extractor
   stands in on CPU.
 - Faithful default for the tau check keeps a scaling quirk (see ISSUES.md #3) behind a flag.
+
+## Final state (end of session)
+Steps 1-6 done and pushed on `nano` (draft PR taokz/EditGRPO#2); `fix-original` pushed with 5 single-bug commits.
+Deviation from the plan: model.py, reward/eval and data/docs were written by parallel subagents against interfaces
+fixed up front; the edit operation, the loss and the integration (rollout.py, train.py) were done by hand.
