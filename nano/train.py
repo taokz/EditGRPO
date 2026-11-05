@@ -87,9 +87,15 @@ def setup_dist():
 
 
 def sequence_log_probs(model, input_ids, attention_mask, responses, pixel_values, image_grid_thw, temperature):
-    """dp_actor.py:169-210 — per-token log-probs of the response tokens; logits divided by temperature (:126,149)."""
-    logits, _ = model(input_ids, attention_mask=attention_mask, pixel_values=pixel_values, image_grid_thw=image_grid_thw)
+    """dp_actor.py:169-210 — per-token log-probs of the response tokens; logits divided by temperature (:126,149).
+    A sampled <|image_pad|> inside the response (only plausible for the tiny random test model) would be mistaken for
+    an image slot, so those positions are fed as pad while the log-prob is still taken for the sampled id."""
     L = responses.shape[1]
+    cfg = model.module.config if hasattr(model, "module") else model.config
+    feed = input_ids.clone()
+    tail = feed[:, -L:]
+    tail[tail == cfg.image_token_id] = cfg.vision_end_token_id
+    logits, _ = model(feed, attention_mask=attention_mask, pixel_values=pixel_values, image_grid_thw=image_grid_thw)
     logits = logits[:, -L - 1:-1, :].float() / temperature
     return torch.gather(torch.log_softmax(logits, dim=-1), 2, responses.unsqueeze(-1)).squeeze(-1)
 
@@ -106,7 +112,7 @@ def main():
     # ---- model, tokenizer, data
     if args.synthetic:
         tok = ByteFallbackTokenizer()
-        cfg = Qwen25VLConfig.tiny(); cfg.vocab_size = max(cfg.vocab_size, tok.vocab_size + 8)
+        cfg = Qwen25VLConfig.tiny(); cfg.vocab_size = tok.vocab_size
         cfg.image_token_id = tok.token_to_id("<|image_pad|>"); cfg.vision_start_token_id = tok.token_to_id("<|vision_start|>")
         cfg.vision_end_token_id = tok.token_to_id("<|vision_end|>")
         model = Qwen25VL(cfg)

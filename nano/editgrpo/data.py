@@ -192,8 +192,8 @@ class ByteFallbackTokenizer:
         for t in ids:
             if t in inv:
                 out.append(buf.decode("utf-8", "ignore")); buf = bytearray(); out.append(inv[t])
-            else:
-                buf.append(t)
+            elif 0 <= t < 256:
+                buf.append(t)          # ids outside the byte range and unknown specials are dropped
         out.append(buf.decode("utf-8", "ignore"))
         return "".join(out)
 
