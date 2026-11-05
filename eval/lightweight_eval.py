@@ -242,6 +242,25 @@ def compute_radcliq_scores(radgraph_scores, bertscore_scores, semb_scores, bleu_
         print("Returning default scores...")
         return [0.0] * len(radgraph_scores), [0.0] * len(radgraph_scores)
 
+
+# Legacy behaviour (paper numbers): clean_text drops duplicate/near-duplicate sentences
+# from both hyps and refs before scoring. Set False via --no-legacy-dedup.
+LEGACY_DEDUP = True
+
+def repetition_metrics(texts):
+    """Repeated-sentence rate and repeated-4-gram rate over a list of texts."""
+    rep_s = tot_s = rep_g = tot_g = 0
+    for t in texts:
+        sents = [re.sub(r'[^\w\s]', '', s).strip().lower() for s in re.split(r'(?<=[.!?])\s+', t)]
+        sents = [s for s in sents if s]
+        tot_s += len(sents)
+        rep_s += len(sents) - len(set(sents))
+        toks = t.lower().split()
+        grams = [tuple(toks[i:i + 4]) for i in range(len(toks) - 3)]
+        tot_g += len(grams)
+        rep_g += len(grams) - len(set(grams))
+    return {"repeated_sentence_rate": rep_s / max(tot_s, 1), "repeated_4gram_rate": rep_g / max(tot_g, 1)}
+
 def clean_text(text):
     """ Remove excessive whitespace, repeated statements, and replace empty text with '[EMPTY]' """
     text = text.strip()  # Remove leading/trailing spaces and newlines
@@ -269,6 +288,9 @@ def clean_text(text):
     unique_sentences = []
     seen_sentences = set()
     seen_normalized_sentences = set()
+    if not LEGACY_DEDUP:
+        unique_sentences = [x.strip() for x in sentences if x.strip()]
+        sentences = []
     
     for sentence in sentences:
         sentence = sentence.strip()
@@ -359,6 +381,7 @@ def main(data_path, save_path):
         refs.append(clean_text(item["answer"]))
         hyps.append(clean_text(item["response"]))
 
+    print("Repetition metrics (hyps):", repetition_metrics(hyps))
     gts = dict(zip(img_ids, refs))
     res = dict(zip(img_ids, hyps))
 
@@ -472,7 +495,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Evaluation for entire dataset")
     parser.add_argument('--data_path', type=str, required=True, help='Path to the input JSON data file')
     parser.add_argument('--save_path', type=str, required=True, help='Path to save the output CSV file')
+    parser.add_argument('--legacy-dedup', dest='legacy_dedup', action='store_true', default=True,
+                        help='Drop repeated sentences before scoring (default; reproduces paper numbers)')
+    parser.add_argument('--no-legacy-dedup', dest='legacy_dedup', action='store_false',
+                        help='Do not drop repeated sentences (still strips EOS/whitespace)')
     args = parser.parse_args()
+    LEGACY_DEDUP = args.legacy_dedup
     
     main(args.data_path, args.save_path)
 
