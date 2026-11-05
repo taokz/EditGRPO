@@ -61,7 +61,8 @@ def rad_compute_score(
     ground_truth: Union[str, List[str]], 
     reward_server='http://REWARD_SERVER_HOST:5000/predict', 
     type='cot', 
-    requested_reward_components: Optional[List[str]] = None
+    requested_reward_components: Optional[List[str]] = None,
+    strict: bool = False
 ) -> Union[Dict[str, float], List[Dict[str, float]]]:
     """
     Compute RadGraph scores and ChexBERT scores by sending request to the RadGraph server.
@@ -71,6 +72,7 @@ def rad_compute_score(
         ground_truth (Union[str, List[str]]): The reference text(s)
         reward_server (str): URL of the RadGraph server
         type (str): Type of format scoring ('short', 'cot', or 'free_form')
+        strict (bool): If True, raise on server errors instead of returning all-zero rewards (default False).
         requested_reward_components (Optional[List[str]]): List of metric names to be summed for the final_score on the server.
         
     Returns:
@@ -122,6 +124,8 @@ def rad_compute_score(
         if r.status_code != 200:
             print(f"[DEBUG rad_compute_score] Error response text: {r.text}")
             print(f"Error from RadGraph server: {r.text}")
+            if strict:
+                raise RuntimeError(f"Reward server error {r.status_code}: {r.text}")
             # return {"overall": 0.0, "format": 0.0, "accuracy": 0.0}
             default_result = {"overall": 0.0, "format": 0.0, "precision": 0.0, "recall": 0.0, "f1": 0.0, 
                             "cxb_balanced_accuracy": 0.0, "cxb_accuracy": 0.0, "cxb_14_micro": 0.0, "cxb_14_macro": 0.0, "cxb_5_micro": 0.0, "cxb_5_macro": 0.0,
@@ -133,6 +137,8 @@ def rad_compute_score(
         if response["result"] != "success":
             print(f"[DEBUG rad_compute_score] Server returned error: {response.get('data', {}).get('message', 'Unknown error')}")
             print(f"Error from RadGraph server: {response['data']['message']}")
+            if strict:
+                raise RuntimeError(f"Reward server error: {response['data']['message']}")
             # return {"overall": 0.0, "format": 0.0, "accuracy": 0.0}
             default_result = {"overall": 0.0, "format": 0.0, "precision": 0.0, "recall": 0.0, "f1": 0.0,
                             "cxb_balanced_accuracy": 0.0, "cxb_accuracy": 0.0, "cxb_14_micro": 0.0, "cxb_14_macro": 0.0, "cxb_5_micro": 0.0, "cxb_5_macro": 0.0,
@@ -194,8 +200,10 @@ def rad_compute_score(
     except BatchScoreShapeError:
         raise
     except Exception as e:
-        print(f"[DEBUG rad_compute_score] Exception details: {type(e).__name__}: {str(e)}")
+        print(f"[DEBUG rad_compute_score] Exception details: {e.__class__.__name__}: {str(e)}")
         print(f"Exception when calling flask server: {str(e)}")
+        if strict:
+            raise
         # return {"overall": 0.0, "format": 0.0, "accuracy": 0.0}
         default_result = {"overall": 0.0, "format": 0.0, "precision": 0.0, "recall": 0.0, "f1": 0.0,
                         "cxb_balanced_accuracy": 0.0, "cxb_accuracy": 0.0, "cxb_14_micro": 0.0, "cxb_14_macro": 0.0, "cxb_5_micro": 0.0, "cxb_5_macro": 0.0,
