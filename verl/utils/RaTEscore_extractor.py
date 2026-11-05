@@ -159,7 +159,7 @@ def cosine_similarity(tensor1, tensor2):
         # Handle other dimensions if needed
         return 0.0
 
-def replace_fp_sentence_complex_rs(paragraph_text_to_modify, fp_entity_info_trigger, ref_entities_info_grouped_by_sentence, similarity_threshold):
+def replace_fp_sentence_complex_rs(paragraph_text_to_modify, fp_entity_info_trigger, ref_entities_info_grouped_by_sentence, similarity_threshold, fix_tau_scaling=False):
     """
     Replace a false positive sentence with the reference sentence that maximizes 
     the sum of maximum cosine similarities between entities, as per equation (2).
@@ -237,7 +237,8 @@ def replace_fp_sentence_complex_rs(paragraph_text_to_modify, fp_entity_info_trig
                 best_ref_sentence = ref_sentence
     
     # Only replace if the best score exceeds the threshold
-    if best_ref_sentence and best_score >= similarity_threshold * len(fp_entities):
+    tau = similarity_threshold if fix_tau_scaling else similarity_threshold * len(fp_entities)
+    if best_ref_sentence and best_score >= tau:
         clean_best_ref_sentence = clean_eos_tokens(best_ref_sentence)  # Clean EOS tokens
         new_paragraph_text = replace_sentence_in_text(paragraph_text_to_modify, fp_sentence_text, clean_best_ref_sentence)
         if new_paragraph_text != paragraph_text_to_modify:
@@ -252,7 +253,7 @@ def replace_fp_sentence_complex_rs(paragraph_text_to_modify, fp_entity_info_trig
     return paragraph_text_to_modify, None
 
 # def process_text_with_server_analysis(gen_text, analysis_result, num_operations=1, operation_priority=None, similarity_threshold=0.6):
-def process_text_with_server_analysis(gen_text, analysis_result, num_operations=1, operation_priority=None, similarity_threshold=0):
+def process_text_with_server_analysis(gen_text, analysis_result, num_operations=1, operation_priority=None, similarity_threshold=0, fix_tau_scaling=False):
     """
     Process a generated text using analysis results from the RaTEScore server.
     
@@ -311,7 +312,8 @@ def process_text_with_server_analysis(gen_text, analysis_result, num_operations=
                     original_fp_sent_text = fp_trigger['sentence']
                     if original_fp_sent_text not in processed_sentences:
                         new_text, op_info = replace_fp_sentence_complex_rs(
-                            modified_text, fp_trigger, ref_entities_grouped_by_sentence, similarity_threshold
+                            modified_text, fp_trigger, ref_entities_grouped_by_sentence, similarity_threshold,
+                            fix_tau_scaling=fix_tau_scaling
                         )
                         if op_info:
                             # Successful replacement
