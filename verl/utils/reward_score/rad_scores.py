@@ -12,6 +12,9 @@ VALID_REWARD_COMPONENTS = {
     "all"              # All components
 }
 
+class BatchScoreShapeError(ValueError):
+    """Server returned fewer per-sample scores than hyps."""
+
 def validate_reward_components(components: Optional[Union[str, List[str]]]) -> Optional[List[str]]:
     """Validate and normalize reward component requests.
     
@@ -155,6 +158,11 @@ def rad_compute_score(
         
         # Ensure all arrays have the same length
         num_samples = len(hyps)
+        if num_samples > 1 and len(final_scores) == 1:
+            raise BatchScoreShapeError(
+                f"Reward server returned a single score for {num_samples} hyps; "
+                "refusing to assign 0.0 to the remaining samples (batch reward mode unsupported by this server)."
+            )
         
         # Create results for each sample
         results = []
@@ -183,6 +191,8 @@ def rad_compute_score(
             print(f"[DEBUG rad_compute_score] Batch results: {results}")
             return results
             
+    except BatchScoreShapeError:
+        raise
     except Exception as e:
         print(f"[DEBUG rad_compute_score] Exception details: {type(e).__name__}: {str(e)}")
         print(f"Exception when calling flask server: {str(e)}")
